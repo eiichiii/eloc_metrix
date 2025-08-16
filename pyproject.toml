@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eloc-metrix"
+version = "0.1.0"
+description = "CLI to recursively measure eLOC/LOC per file"
+readme = "README.md"
+requires-python = ">=3.9"
+keywords = ["loc", "eloc", "code-metrics", "cli"]
+dependencies = []
+
+[project.scripts]
+eloc-metrix = "eloc_metrix:main"
+
+[tool.setuptools]
+py-modules = ["eloc_metrix"]
+
