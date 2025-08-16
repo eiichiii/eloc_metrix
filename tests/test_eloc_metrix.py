@@ -166,6 +166,53 @@ class TestElocMetrix(unittest.TestCase):
                 first_entry = lines[idx + 1]
                 self.assertIn("newer.py", first_entry)
 
+    def test_language_summary(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "src").mkdir()
+            # Create files: JS should have more eLOC than Python; Unknown should be last
+            # JavaScript total eLOC: 3 (two files: 2 + 1)
+            (root / "src" / "b1.js").write_text("const a=1;\nconst b=2;\n", encoding="utf-8")
+            (root / "src" / "b2.js").write_text("const c=3;\n", encoding="utf-8")
+            # Python total eLOC: 2 (two files: 1 + 1)
+            (root / "src" / "a1.py").write_text("x=1\n", encoding="utf-8")
+            (root / "src" / "a2.py").write_text("y=2\n", encoding="utf-8")
+            # Unknown with larger eLOC but should be printed last in summary
+            (root / "src" / "u.unknown").write_text("line1\nline2\nline3\nline4\n", encoding="utf-8")
+
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = em.main([str(root)])
+            self.assertEqual(rc, 0)
+            out = buf.getvalue()
+            self.assertIn("Languages Summary", out)
+            # Expect Python and JavaScript entries with files>=1
+            self.assertRegex(out, r"- Python: .*files=2\b")
+            self.assertRegex(out, r"- JavaScript: .*files=2\b")
+            # Unknown should be last in the summary order
+            lines = out.splitlines()
+            idx_langs = lines.index("Languages Summary")
+            # capture the next few lines until a blank or next header
+            block = []
+            for line in lines[idx_langs + 1:]:
+                if not line.strip():
+                    break
+                if line.startswith("Top 10 in"):
+                    break
+                if line.startswith("-"):
+                    block.append(line)
+                else:
+                    break
+            joined = "\n".join(block)
+            # Ensure Unknown appears in block and is the last bullet line
+            unknown_lines = [i for i, l in enumerate(block) if l.startswith("- Unknown:")]
+            self.assertTrue(unknown_lines, "Unknown summary line missing")
+            self.assertEqual(unknown_lines[-1], len(block) - 1)
+
+            # Verify Top 20 sections for the top non-Unknown languages exist
+            self.assertIn("Top 20 in JavaScript", out)
+            self.assertIn("Top 20 in Python", out)
+
 
 if __name__ == "__main__":
     unittest.main()
