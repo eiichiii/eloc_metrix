@@ -117,12 +117,54 @@ class TestElocMetrix(unittest.TestCase):
 
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
-                files, eloc, loc = em.walk_and_count(root, excluded)
+                files, eloc, loc, results = em.walk_and_count(root, excluded)
 
             # Only m.py and a.js should be counted
             self.assertEqual(files, 2)
             self.assertEqual(eloc, 2)  # 1 from py + 1 from js
             self.assertEqual(loc, 5)   # 3 from py + 2 from js
+            # results contains exactly the two files
+            paths = {p.name for (p, _, _) in results}
+            self.assertEqual(paths, {"m.py", "a.js"})
+
+    def test_latest_top10_output(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "src").mkdir()
+
+            f1 = root / "src" / "older.py"
+            f1.write_text("x=1\n", encoding="utf-8")
+            f2 = root / "src" / "newer.py"
+            f2.write_text("x=2\n", encoding="utf-8")
+            f3 = root / "src" / "middle.py"
+            f3.write_text("x=3\n", encoding="utf-8")
+
+            # Set mtimes explicitly
+            import time
+            now = time.time()
+            os.utime(f1, (now - 300, now - 300))  # oldest
+            os.utime(f3, (now - 200, now - 200))
+            os.utime(f2, (now - 100, now - 100))  # newest
+
+            # Run the CLI main with no exclude file
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = em.main([str(root)])
+            self.assertEqual(rc, 0)
+            out = buf.getvalue()
+            # Ensure header present and the first listed file is the newest
+            self.assertIn("Latest Top 10", out)
+            # Find the line after the header
+            lines = out.splitlines()
+            try:
+                idx = lines.index("Latest Top 10")
+            except ValueError:
+                idx = -1
+            self.assertGreaterEqual(idx, 0)
+            # The first entry line should contain newer.py
+            if idx >= 0 and idx + 1 < len(lines):
+                first_entry = lines[idx + 1]
+                self.assertIn("newer.py", first_entry)
 
 
 if __name__ == "__main__":

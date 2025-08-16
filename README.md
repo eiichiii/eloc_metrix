@@ -5,7 +5,7 @@ Command-line tool to recursively enumerate files under a directory and measure:
 - LOC: total lines (including blanks and comments)
 - eLOC: effective lines of code (non-empty, non-comment lines)
 
-It prints a hierarchical tree of directories/files with per-file eLOC/LOC and a summary of totals.
+It prints a hierarchical tree of directories/files with per-file eLOC/LOC, a summary of totals, the Top 30 files by eLOC, and the Latest Top 10 by modification time.
 
 ## Usage
 
@@ -55,10 +55,19 @@ my-project/
     main.py  eLOC: 120  LOC: 170
     utils.js  eLOC: 90  LOC: 140
 
-Summary
-- Files counted: 3
-- Total eLOC:   390
-- Total LOC:    570
+ Summary
+ - Files counted: 3
+ - Total eLOC:   390
+ - Total LOC:    570
+ 
+ Top 30 by eLOC
+  1. src/main.py  eLOC: 120  LOC: 170
+  2. src/utils.js  eLOC: 90  LOC: 140
+  3. eloc_metrix.py  eLOC: 180  LOC: 260
+
+ Latest Top 10
+  1. src/utils.js  eLOC: 90  LOC: 140  Updated: 2025-01-01 12:34:56
+  2. src/main.py   eLOC: 120 LOC: 170  Updated: 2025-01-01 12:00:00
 ```
 
 ## Tips

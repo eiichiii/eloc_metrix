@@ -16,6 +16,7 @@ import argparse
 import os
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from datetime import datetime
 
 
 def load_excluded_extensions(file_path: Path) -> Set[str]:
@@ -177,7 +178,7 @@ def count_loc_eloc_for_file(path: Path) -> Tuple[int, int]:
     return eloc, loc
 
 
-def walk_and_count(root: Path, excluded_exts: Set[str]) -> Tuple[int, int, int]:
+def walk_and_count(root: Path, excluded_exts: Set[str]) -> Tuple[int, int, int, List[Tuple[Path, int, int]]]:
     """Walk directory `root`, print a hierarchical tree with per-file counts.
 
     Returns a tuple (files_counted, total_eloc, total_loc).
@@ -185,6 +186,7 @@ def walk_and_count(root: Path, excluded_exts: Set[str]) -> Tuple[int, int, int]:
     total_eloc = 0
     total_loc = 0
     total_files = 0
+    results: List[Tuple[Path, int, int]] = []  # (path, eloc, loc)
 
     # Common directories to skip regardless of extension
     skip_dirs = {'.git', '.hg', '.svn', '.idea', '.vscode', '__pycache__',
@@ -227,10 +229,11 @@ def walk_and_count(root: Path, excluded_exts: Set[str]) -> Tuple[int, int, int]:
             total_eloc += eloc
             total_loc += loc
             total_files += 1
+            results.append((fpath, eloc, loc))
 
             print(f"{indent}  {fname}  eLOC: {eloc}  LOC: {loc}")
 
-    return total_files, total_eloc, total_loc
+    return total_files, total_eloc, total_loc, results
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -258,7 +261,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         # Friendly hint if the default file isn't present
         print(f"Note: exclude file '{exclude_file}' not found; counting all extensions.")
 
-    files, eloc, loc = walk_and_count(root, excluded_exts)
+    files, eloc, loc, results = walk_and_count(root, excluded_exts)
 
     print()
     print("Summary")
@@ -266,9 +269,42 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"- Total eLOC:   {eloc}")
     print(f"- Total LOC:    {loc}")
 
+    # Top 30 files by eLOC
+    if results:
+        print()
+        print("Top 30 by eLOC")
+        # Sort by eLOC desc, then LOC desc, then path for stability
+        top = sorted(results, key=lambda t: (-t[1], -t[2], str(t[0]).lower()))[:30]
+        for idx, (fpath, feloc, floc) in enumerate(top, 1):
+            try:
+                rel = fpath.resolve().relative_to(root.resolve())
+                rel_str = str(rel)
+            except Exception:
+                rel_str = str(fpath)
+            print(f"{idx:2d}. {rel_str}  eLOC: {feloc}  LOC: {floc}")
+
+        # Latest Top 10 by modification time
+        print()
+        print("Latest Top 10")
+        with_times: List[Tuple[Path, int, int, float]] = []
+        for fpath, feloc, floc in results:
+            try:
+                mtime = fpath.stat().st_mtime
+            except OSError:
+                mtime = 0.0
+            with_times.append((fpath, feloc, floc, mtime))
+        latest = sorted(with_times, key=lambda t: (-t[3], str(t[0]).lower()))[:10]
+        for idx, (fpath, feloc, floc, mtime) in enumerate(latest, 1):
+            try:
+                rel = fpath.resolve().relative_to(root.resolve())
+                rel_str = str(rel)
+            except Exception:
+                rel_str = str(fpath)
+            ts = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S') if mtime else 'N/A'
+            print(f"{idx:2d}. {rel_str}  eLOC: {feloc}  LOC: {floc}  Updated: {ts}")
+
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -95,3 +95,7 @@
 .md
 .rst
 .txt
+
+# others
+.po
+
