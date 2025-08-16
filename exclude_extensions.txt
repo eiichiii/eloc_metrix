@@ -1,0 +1,97 @@
+# Excluded file extensions for eLOC/LOC counting
+# - One extension per line
+# - Lines starting with '#' are comments
+# - Extensions may start with '.' or not; case-insensitive
+
+# Archives / compressed
+.zip
+.tar
+.gz
+.bz2
+.xz
+.7z
+.rar
+.tgz
+.tar.gz
+
+# Compiled / binaries / objects
+.exe
+.dll
+.so
+.dylib
+.o
+.a
+.lib
+.class
+.jar
+.war
+.ear
+.pyc
+.pyo
+.pyd
+.wasm
+
+# Images / design assets
+.png
+.jpg
+.jpeg
+.gif
+.bmp
+.ico
+.icns
+.tif
+.tiff
+.webp
+.svg
+.psd
+.ai
+
+# Fonts
+.ttf
+.otf
+.woff
+.woff2
+.eot
+
+# Audio / video
+.mp3
+.wav
+.flac
+.ogg
+.mp4
+.m4v
+.mov
+.avi
+.mkv
+.webm
+
+# Documents
+.pdf
+.doc
+.docx
+.xls
+.xlsx
+.ppt
+.pptx
+.rtf
+.odt
+.ods
+.odp
+
+# Databases / data blobs
+.sqlite
+.sqlite3
+.db
+.db3
+.parquet
+.feather
+.avro
+
+# Logs / misc
+.log
+.lock
+
+# Text/docs typically not counted as code
+.md
+.rst
+.txt
