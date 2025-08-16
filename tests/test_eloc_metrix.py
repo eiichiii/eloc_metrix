@@ -1,0 +1,129 @@
+import io
+import os
+from pathlib import Path
+import tempfile
+import contextlib
+import unittest
+import sys
+
+# Ensure project root is importable
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import eloc_metrix as em
+
+
+class TestElocMetrix(unittest.TestCase):
+    def test_load_excluded_extensions(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "ex.txt"
+            p.write_text("""
+            # comment
+            md
+            .log
+
+            # mixed case
+            JPG
+            """.strip(), encoding="utf-8")
+
+            exts = em.load_excluded_extensions(p)
+            self.assertEqual(exts, {".md", ".log", ".jpg"})
+
+    def test_count_python_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            f = Path(td) / "sample.py"
+            content = (
+                "# a comment line\n"
+                "\n"
+                "x = 1\n"
+                "x = 2  # inline comment\n"
+                "\n"
+                "# another comment"
+            )
+            f.write_text(content, encoding="utf-8")
+
+            eloc, loc = em.count_loc_eloc_for_file(f)
+            # LOC: all lines
+            self.assertEqual(loc, 6)
+            # eLOC: two lines with code
+            self.assertEqual(eloc, 2)
+
+    def test_count_c_like_block_comments(self):
+        with tempfile.TemporaryDirectory() as td:
+            f = Path(td) / "code.js"
+            content = (
+                "/* header block\n"
+                "still comment */\n"
+                "\n"
+                "// line comment\n"
+                "const a = 1; // trailing ok\n"
+                "/* block start */ const b = 2; /* midline block end */\n"
+                "const c = 3; /* trailing block start\n"
+                "multi line\n"
+                "end */ const d = 4;"
+            )
+            f.write_text(content, encoding="utf-8")
+
+            eloc, loc = em.count_loc_eloc_for_file(f)
+            # Count lines: 9 logical lines in the text above
+            self.assertEqual(loc, 9)
+            # eLOC: code lines are: a, b, c, d => 4
+            self.assertEqual(eloc, 4)
+
+    def test_count_html_block_comments(self):
+        with tempfile.TemporaryDirectory() as td:
+            f = Path(td) / "page.html"
+            f.write_text("<!-- header comment -->\n<div>hi</div>", encoding="utf-8")
+            eloc, loc = em.count_loc_eloc_for_file(f)
+            self.assertEqual(loc, 2)
+            self.assertEqual(eloc, 1)
+
+    def test_unknown_extension_counts_non_empty(self):
+        with tempfile.TemporaryDirectory() as td:
+            f = Path(td) / "data.foo"
+            f.write_text("a\n\n# not a comment here", encoding="utf-8")
+            eloc, loc = em.count_loc_eloc_for_file(f)
+            # 3 lines total
+            self.assertEqual(loc, 3)
+            # Non-empty lines = 2 ("a" and "# not a comment here")
+            self.assertEqual(eloc, 2)
+
+    def test_walk_and_count_with_excludes_and_skips(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            # Create directories
+            (root / "src").mkdir()
+            (root / "node_modules").mkdir()
+            (root / ".git").mkdir()
+
+            # Files to be counted
+            py = root / "src" / "m.py"
+            py.write_text("x = 1\n# c\n\n", encoding="utf-8")  # loc=3, eloc=1
+
+            js = root / "src" / "a.js"
+            js.write_text("// c\nconst a=1;\n", encoding="utf-8")  # loc=2, eloc=1
+
+            # Excluded by extension
+            md = root / "src" / "README.md"
+            md.write_text("# title\n\ntext\n", encoding="utf-8")
+
+            # Skipped directories (should not be scanned)
+            (root / "node_modules" / "pkg.js").write_text("const x=1;\n", encoding="utf-8")
+            (root / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+
+            # Exclude set
+            excluded = {".md"}
+
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                files, eloc, loc = em.walk_and_count(root, excluded)
+
+            # Only m.py and a.js should be counted
+            self.assertEqual(files, 2)
+            self.assertEqual(eloc, 2)  # 1 from py + 1 from js
+            self.assertEqual(loc, 5)   # 3 from py + 2 from js
+
+
+if __name__ == "__main__":
+    unittest.main()
